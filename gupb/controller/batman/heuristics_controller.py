@@ -2,11 +2,11 @@ from typing import Optional
 
 from gupb import controller
 from gupb.model import arenas
-from gupb.controller.batman.navigation import Navigation
-from gupb.controller.batman.environment.knowledge import Knowledge
-from gupb.controller.batman.strategies.scouting import ScoutingStrategy
-from gupb.controller.batman.strategies.defending import DefendingStrategy
-from gupb.controller.batman.events import EventDetector
+from gupb.controller.batman.heuristic.navigation import Navigation
+from gupb.controller.batman.knowledge.knowledge import Knowledge
+from gupb.controller.batman.heuristic.strategies.scouting import ScoutingStrategy
+from gupb.controller.batman.heuristic.strategies.defending import DefendingStrategy
+from gupb.controller.batman.heuristic.events import EventDetector
 from gupb.model.characters import Action, ChampionKnowledge, Tabard
 
 

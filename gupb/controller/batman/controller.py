@@ -2,12 +2,13 @@ from typing import Optional
 
 from gupb import controller
 from gupb.model import arenas
-from gupb.controller.batman.algo.trainer import Trainer
-from gupb.controller.batman.environment.knowledge import Knowledge
-from gupb.controller.batman.environment.observer import Observer, Observable
+from gupb.controller.batman.rl.algo import DQN, AlgoConfig
+from gupb.controller.batman.rl.environment import GUPBEnv
+from gupb.controller.batman.knowledge.knowledge import Knowledge
+from gupb.controller.batman.utils.observer import Observer, Observable
 from gupb.model.characters import Action, ChampionKnowledge, Tabard
 
-import time
+from gupb.controller.batman.rl.environment.observation import SimpleObservation
 
 
 class BatmanController(controller.Controller, Observer[Action], Observable[Knowledge]):
@@ -21,7 +22,22 @@ class BatmanController(controller.Controller, Observer[Action], Observable[Knowl
         self._game = 0
         self._knowledge: Optional[Knowledge] = None
 
-        self._trainer = Trainer(self, "./gupb/controller/batman/algo/resources/algo")
+        # TODO observation config
+        # observation
+        neighborhood_range = 20
+        observation_function = SimpleObservation(neighborhood_range)
+
+        # env
+        self._env = GUPBEnv(observation_function)
+
+        self._env.attach(self)
+        self.attach(self._env)
+
+        self._path_to_algo = "./gupb/controller/batman/rl/resources/algo"
+
+        self._algo = DQN(self._env, AlgoConfig())
+        self._timestep = 0
+        self._timesteps_per_game = 10000
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         assert (
@@ -34,17 +50,17 @@ class BatmanController(controller.Controller, Observer[Action], Observable[Knowl
 
         action = self.wait_for_observed()
 
-        self._trainer.next_step()
-
         return action
 
     def praise(self, score: int) -> None:
-        self._trainer.stop(self._knowledge, save=self._game % 10 == 0)
+        self._timestep = self._algo.terminate()
+        self._algo.save(self._path_to_algo)
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        self._trainer.start(load=self._game == 0)
+        self._algo.load(self._path_to_algo)
+        self._algo.run(self._timestep, self._timestep + self._timesteps_per_game)
         self._episode = 0
-        self._game += 1
+        self._game += game_no
         self._knowledge = Knowledge(arena_description)
         self.observable_state = self._knowledge
 
