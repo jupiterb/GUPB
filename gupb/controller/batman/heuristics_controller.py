@@ -1,19 +1,11 @@
 from typing import Optional
-import time
 
 from gupb import controller
 from gupb.model import arenas
 from gupb.controller.batman.navigation import Navigation
-from gupb.controller.batman.passthrough import Passthrough
 from gupb.controller.batman.environment.knowledge import Knowledge
-from gupb.controller.batman.strategies import (
-    DefendingStrategy,
-    FightingStrategy,
-    HidingStrategy,
-    RotatingStrategy,
-    RunningAwayStrategy,
-    ScoutingStrategy,
-)
+from gupb.controller.batman.strategies.scouting import ScoutingStrategy
+from gupb.controller.batman.strategies.defending import DefendingStrategy
 from gupb.controller.batman.events import EventDetector
 from gupb.model.characters import Action, ChampionKnowledge, Tabard
 
@@ -36,7 +28,6 @@ class BatmanHeuristicsController(controller.Controller):
 
         self._event_detector = EventDetector()
         self._navigation = None
-        self._passthrough = None
 
     def decide(self, knowledge: ChampionKnowledge) -> Action:
         assert (
@@ -47,20 +38,11 @@ class BatmanHeuristicsController(controller.Controller):
         self._knowledge.update(knowledge, self._episode)
 
         events = self._event_detector.detect(self._knowledge)
-
-        action = None
-        changed_strategies = 0
-        while action is None and changed_strategies < 10:
-            action, strategy = self._current_strategy.decide(
-                self._knowledge, events, self._navigation
-            )
-            self._current_strategy = self._strategies[strategy]
-            changed_strategies += 1
-
-        # this should never happen (but it does happen xd)
-        if action is None:
-            # print('WARNING: endless loop in strategies changing')
-            action = Action.DO_NOTHING
+        action, strategy = self._current_strategy.decide(
+            self._knowledge, events, self._navigation
+        )
+        # print(self._current_strategy, action)
+        self._current_strategy = self._strategies[strategy]
 
         return action
 
@@ -72,14 +54,9 @@ class BatmanHeuristicsController(controller.Controller):
         self._game += 1
         self._knowledge = Knowledge(arena_description)
         self._navigation = Navigation(self._knowledge)
-        self._passthrough = Passthrough(self._knowledge, self._navigation, samples=1000)
         self._strategies = {
-            "defending": DefendingStrategy(),
-            "fighting": FightingStrategy(),
-            "hiding": HidingStrategy(self._passthrough),
-            "rotating": RotatingStrategy(),
-            "running_away": RunningAwayStrategy(),
             "scouting": ScoutingStrategy(),
+            "defending": DefendingStrategy(),
         }
         self._current_strategy = self._strategies["scouting"]
 
