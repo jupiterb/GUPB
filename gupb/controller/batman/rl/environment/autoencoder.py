@@ -114,9 +114,6 @@ class ConvAutoEncoder(nn.Module):
             )
             in_channels = out_channels
 
-        print(self._encoder)
-        print(self._decoder)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         latent = self._encoder(x)
         return self._decoder(latent)
