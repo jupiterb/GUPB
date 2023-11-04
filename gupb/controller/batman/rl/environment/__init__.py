@@ -6,7 +6,7 @@ from typing import Any
 
 from gupb.controller.batman.knowledge.knowledge import Knowledge
 from gupb.controller.batman.rl.environment.observation import SomeObservation
-from gupb.controller.batman.rl.environment.reward import HeuristicReward
+from gupb.controller.batman.rl.environment.reward import DefaultReward
 from gupb.controller.batman.utils.observer import Observer, Observable
 from gupb.model.characters import Action
 
@@ -26,7 +26,7 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
             dtype=np.float16,
         )
 
-        self._reward = HeuristicReward()
+        self._reward = DefaultReward()
         self._observation = observation
 
         self._actions = [action for action in Action]
@@ -41,7 +41,7 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
 
         obs = self._observation(knowledge)
         reward = self._reward(knowledge, action)
-        done = knowledge.episode == 0
+        done = False
         truncated = False
         info = {}
 
@@ -51,7 +51,7 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[Any, dict[str, Any]]:
         knowledge = self.wait_for_observed()
-        self._reward.reset(knowledge)
+        self._reward.reset()
 
         obs = self._observation(knowledge)
         info = {}

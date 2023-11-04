@@ -14,12 +14,15 @@ from gupb.model.coordinates import Coords
 
 class SomeReward(ABC):
     @abstractmethod
-    def _compute(self, knowledge: Knowledge) -> float:
+    def _compute(self, knowledge: Knowledge, action: Action) -> float:
         raise NotImplementedError()
 
-    def __call__(self, knowledge: Knowledge) -> float:
+    def __call__(self, knowledge: Knowledge, action: Action) -> float:
         """returns reward in the range from -1 to 1"""
-        return self._compute(knowledge)
+        return self._compute(knowledge, action)
+
+    def reset(self) -> None:
+        pass
 
 
 Weight = float
@@ -32,35 +35,50 @@ class AccumulatedReward(SomeReward):
         self._total_weight = sum(weights)
         self._weighted_reward = weighted_reward
 
-    def _compute(self, knowledge: Knowledge) -> float:
-        return (
-            sum(
-                [reward(knowledge) * weight for reward, weight in self._weighted_reward]
-            )
-            / self._total_weight
+    def _compute(self, knowledge: Knowledge, action: Action) -> float:
+        rewards = [
+            reward(knowledge, action) * weight
+            for reward, weight in self._weighted_reward
+        ]
+        return sum(rewards) / self._total_weight
+
+    def reset(self) -> None:
+        for reward, _ in self._weighted_reward:
+            reward.reset()
+
+
+class DefaultReward(SomeReward):
+    def __init__(self) -> None:
+        self._reward = AccumulatedReward(
+            [
+                (MenhirProximityReward(7, 60), 0.3),
+                (StayingHealthyReward(5), 0.3),
+                (FindingWeaponReward(50), 0.4),
+            ]
         )
 
+    def _compute(self, knowledge: Knowledge, action: Action) -> float:
+        return self._reward(knowledge, action)
 
-class HeuristicReward:
+    def reset(self) -> None:
+        return self._reward.reset()
+
+
+class HeuristicReward(SomeReward):
     def __init__(self) -> None:
-        self._strategies = {
-            "scouting": ScoutingStrategy(),
-            "defending": DefendingStrategy(),
-        }
-        self._current_strategy = self._strategies["scouting"]
+        self.reset()
         self._event_decoder = EventDetector()
-        self._navigation = None
 
-    def __call__(self, knowledge: Knowledge, action: Action) -> float:
+    def _compute(self, knowledge: Knowledge, action: Action) -> float:
         events = self._event_decoder.detect(knowledge)
+        navigation = Navigation(knowledge)
         heuristic_action, strategy = self._current_strategy.decide(
-            knowledge, events, self._navigation
+            knowledge, events, navigation
         )
         self._current_strategy = self._strategies[strategy]
         return 1.0 if heuristic_action == action else 0.0
 
-    def reset(self, knowledge: Knowledge) -> None:
-        self._navigation = Navigation(knowledge)
+    def reset(self) -> None:
         self._strategies = {
             "scouting": ScoutingStrategy(),
             "defending": DefendingStrategy(),
@@ -79,7 +97,7 @@ class MenhirProximityReward(SomeReward):
         self._save_distance_to_menhir = save_distance_to_menhir
         self._episodes_to_found_menhir = episodes_to_found_menhir
 
-    def _compute(self, knowledge: Knowledge) -> float:
+    def _compute(self, knowledge: Knowledge, action: Action) -> float:
         if knowledge.arena.menhir_position is None:
             penalty = min(
                 knowledge.episode / self._episodes_to_found_menhir,
@@ -101,7 +119,7 @@ class UpdatedKnowledgeReward(SomeReward):
         self._uptodate_till = uptodate_till
         self._radius = radius
 
-    def _compute(self, knowledge: Knowledge) -> float:
+    def _compute(self, knowledge: Knowledge, action: Action) -> float:
         episodes = np.array(
             [
                 tile.last_seen
@@ -122,7 +140,7 @@ class MotionEntropyReward(SomeReward):
         self._max_size = positions_buffer_size
         self._buffer = deque(maxlen=self._max_size)
 
-    def _compute(self, knowledge: Knowledge) -> float:
+    def _compute(self, knowledge: Knowledge, action: Action) -> float:
         self._buffer.append(knowledge.position)
         xs = [x for x, _ in self._buffer]
         ys = [y for _, y in self._buffer]
@@ -139,7 +157,7 @@ class StayingAliveReward(SomeReward):
     def __init__(self) -> None:
         self._total_chempions: int | None = None
 
-    def _compute(self, knowledge: Knowledge) -> float:
+    def _compute(self, knowledge: Knowledge, action: Action) -> float:
         if self._total_chempions is None:
             self._total_chempions = knowledge.champions_alive
         return 1 - knowledge.champions_alive / self._total_chempions
@@ -149,7 +167,7 @@ class StayingHealthyReward(SomeReward):
     def __init__(self, acceptable_health: int) -> None:
         self._acceptable_health = acceptable_health
 
-    def _compute(self, knowledge: Knowledge) -> float:
+    def _compute(self, knowledge: Knowledge, action: Action) -> float:
         tile = knowledge.arena.explored_map.get(knowledge.position)
         if tile is None:
             return 0
@@ -162,7 +180,7 @@ class FindingWeaponReward(SomeReward):
     def __init__(self, episodes_to_find_weapon: int) -> None:
         self._episodes_to_find_weapon = episodes_to_find_weapon
 
-    def _compute(self, knowledge: Knowledge) -> float:
+    def _compute(self, knowledge: Knowledge, action: Action) -> float:
         tile = knowledge.arena.explored_map.get(knowledge.position)
         if tile is None:
             return 0

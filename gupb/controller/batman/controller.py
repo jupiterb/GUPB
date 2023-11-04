@@ -57,8 +57,12 @@ class BatmanController(controller.Controller, Observer[Action], Observable[Knowl
         self._algo.save(self._path_to_algo)
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
-        self._algo.load(self._path_to_algo)
+        try:
+            self._algo.load(self._path_to_algo)
+        except:
+            pass
         self._algo.run(self._timestep, self._timestep + self._timesteps_per_game)
+
         self._episode = 0
         self._game += game_no
         self._knowledge = Knowledge(arena_description)

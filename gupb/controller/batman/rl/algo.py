@@ -13,8 +13,8 @@ from gupb.controller.batman.rl.environment.feature_extractors import Neighborhoo
 class AlgoConfig:
     learning_rate: float = 0.005
     batch_size: int = 32
-    buffer_size: int = 500
-    learning_starts: int = 30
+    buffer_size: int = 10000
+    learning_starts: int = 300
     tau: float = 0.05
     gamma: float = 0.98
     feature_extractor_class: BaseFeaturesExtractor = NeighborhoodCNN
