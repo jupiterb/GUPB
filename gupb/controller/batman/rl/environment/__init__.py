@@ -3,6 +3,7 @@ from gymnasium.envs.registration import register
 
 import numpy as np
 from typing import Any
+import numpy as np
 
 from gupb.controller.batman.knowledge.knowledge import Knowledge
 from gupb.controller.batman.rl.environment.observation import SomeObservation
@@ -18,10 +19,9 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
         Observable.__init__(self)
 
         self.action_space = gym.spaces.Discrete(len(Action))
-
         self.observation_space = gym.spaces.Box(
-            low=-0,
-            high=1,
+            low=-np.inf,
+            high=np.inf,
             shape=observation.observation_shape,
             dtype=np.float16,
         )
@@ -38,7 +38,6 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
         action = self._actions[action_idx]
         self.observable_state = action
         knowledge = self.wait_for_observed()
-
         obs = self._observation(knowledge)
         reward = self._reward(knowledge, action)
         done = False

@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 import stable_baselines3.dqn as dqn
 from threading import Thread
 
 from gupb.controller.batman.rl.environment import GUPBEnv
-from gupb.controller.batman.rl.environment.feature_extractors import NeighborhoodCNN
+from gupb.controller.batman.utils.resources import PATH_TO_ALGO, PATH_TO_REPLY_BUFFER
+from gupb.controller.batman.rl.environment.autoencoder import EncoderFeatureExtractor
 
 
 @dataclass
@@ -15,9 +15,8 @@ class AlgoConfig:
     batch_size: int = 32
     buffer_size: int = 10000
     learning_starts: int = 300
-    tau: float = 0.05
+    tau: float = 1.0
     gamma: float = 0.98
-    feature_extractor_class: BaseFeaturesExtractor = NeighborhoodCNN
 
 
 class SomeAlgo(ABC):
@@ -46,13 +45,13 @@ class SomeAlgo(ABC):
         self._training.join()
         return timesetps
 
-    def save(self, path: str) -> None:
-        self._algo.save(path)
-        self._algo.save_replay_buffer(f"{path}_reply_buffer")
+    def save(self) -> None:
+        self._algo.save(PATH_TO_ALGO)
+        self._algo.save_replay_buffer(PATH_TO_REPLY_BUFFER)
 
-    def load(self, path: str) -> None:
-        self._algo.load(path)
-        self._algo.load_replay_buffer(f"{path}_reply_buffer")
+    def load(self) -> None:
+        self._algo.load(PATH_TO_ALGO)
+        self._algo.load_replay_buffer(PATH_TO_REPLY_BUFFER)
 
     @abstractmethod
     def _build_algo(self, env, config: AlgoConfig) -> OffPolicyAlgorithm:
@@ -68,7 +67,7 @@ class SomeAlgo(ABC):
 class DQN(SomeAlgo):
     def _build_algo(self, env, config: AlgoConfig) -> OffPolicyAlgorithm:
         return dqn.DQN(
-            policy=dqn.CnnPolicy,
+            policy=dqn.MlpPolicy,
             env=env,
             learning_rate=config.learning_rate,
             batch_size=config.batch_size,
@@ -76,8 +75,7 @@ class DQN(SomeAlgo):
             learning_starts=config.learning_starts,
             tau=config.tau,
             gamma=config.gamma,
-            verbose=1,
             policy_kwargs={
-                "features_extractor_class": config.feature_extractor_class,
+                "features_extractor_class": EncoderFeatureExtractor,
             },
         )
