@@ -3,11 +3,18 @@ from collections import deque
 import numpy as np
 import scipy.stats as stats
 
-from gupb.controller.batman.heuristic.events import EventDetector
 from gupb.controller.batman.heuristic.navigation import Navigation
-from gupb.controller.batman.heuristic.strategies.scouting import ScoutingStrategy
-from gupb.controller.batman.heuristic.strategies.defending import DefendingStrategy
+from gupb.controller.batman.heuristic.passthrough import Passthrough
 from gupb.controller.batman.knowledge.knowledge import Knowledge
+from gupb.controller.batman.heuristic.strategies import (
+    DefendingStrategy,
+    FightingStrategy,
+    HidingStrategy,
+    RotatingStrategy,
+    RunningAwayStrategy,
+    ScoutingStrategy,
+)
+from gupb.controller.batman.heuristic.events import EventDetector
 from gupb.model.characters import Action
 from gupb.model.coordinates import Coords
 
@@ -21,7 +28,7 @@ class SomeReward(ABC):
         """returns reward in the range from -1 to 1"""
         return self._compute(knowledge, action)
 
-    def reset(self) -> None:
+    def reset(self, knowledge: Knowledge) -> None:
         pass
 
 
@@ -42,46 +49,49 @@ class AccumulatedReward(SomeReward):
         ]
         return sum(rewards) / self._total_weight
 
-    def reset(self) -> None:
+    def reset(self, knowledge: Knowledge) -> None:
         for reward, _ in self._weighted_reward:
-            reward.reset()
+            reward.reset(knowledge)
 
 
 class DefaultReward(SomeReward):
     def __init__(self) -> None:
         self._reward = AccumulatedReward(
             [
-                (MenhirProximityReward(7, 60), 0.3),
-                (StayingHealthyReward(5), 0.3),
-                (FindingWeaponReward(50), 0.4),
+                (HeuristicReward(), 0.7),
+                (StayingAliveReward(), 0.3),
             ]
         )
 
     def _compute(self, knowledge: Knowledge, action: Action) -> float:
         return self._reward(knowledge, action)
 
-    def reset(self) -> None:
-        return self._reward.reset()
+    def reset(self, knowledge: Knowledge) -> None:
+        return self._reward.reset(knowledge)
 
 
 class HeuristicReward(SomeReward):
     def __init__(self) -> None:
-        self.reset()
         self._event_decoder = EventDetector()
 
     def _compute(self, knowledge: Knowledge, action: Action) -> float:
         events = self._event_decoder.detect(knowledge)
-        navigation = Navigation(knowledge)
         heuristic_action, strategy = self._current_strategy.decide(
-            knowledge, events, navigation
+            knowledge, events, self._navigation
         )
         self._current_strategy = self._strategies[strategy]
         return 1.0 if heuristic_action == action else 0.0
 
-    def reset(self) -> None:
+    def reset(self, knowledge: Knowledge) -> None:
+        self._navigation = Navigation(knowledge)
+        self._passthrough = Passthrough(knowledge, self._navigation, samples=1000)
         self._strategies = {
-            "scouting": ScoutingStrategy(),
             "defending": DefendingStrategy(),
+            "fighting": FightingStrategy(),
+            "hiding": HidingStrategy(self._passthrough),
+            "rotating": RotatingStrategy(),
+            "running_away": RunningAwayStrategy(),
+            "scouting": ScoutingStrategy(),
         }
         self._current_strategy = self._strategies["scouting"]
 

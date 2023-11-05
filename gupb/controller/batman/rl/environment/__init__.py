@@ -50,7 +50,7 @@ class GUPBEnv(gym.Env, Observer[Knowledge], Observable[Action]):
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[Any, dict[str, Any]]:
         knowledge = self.wait_for_observed()
-        self._reward.reset()
+        self._reward.reset(knowledge)
 
         obs = self._observation(knowledge)
         info = {}
