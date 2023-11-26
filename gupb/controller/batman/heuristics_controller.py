@@ -62,7 +62,7 @@ class BatmanHeuristicsController(controller.Controller):
         return action
 
     def praise(self, score: int) -> None:
-        self._trainer.add_to_buffer(self._state, self._params, score / 1000)
+        self._trainer.add_to_buffer(self._state, self._params, score / 100)
         self._trainer.force_training_end()
 
     def reset(self, game_no: int, arena_description: arenas.ArenaDescription) -> None:
@@ -72,8 +72,7 @@ class BatmanHeuristicsController(controller.Controller):
         self._navigation = Navigation(self._knowledge)
         self._passthrough = Passthrough(self._knowledge, self._navigation, samples=1000)
 
-        if game_no % 3 == 0 and game_no > 0:
-            self._trainer.train()
+        self._trainer.train()
 
     def _parametrize_strategies(self):
         self._state = np.concatenate(

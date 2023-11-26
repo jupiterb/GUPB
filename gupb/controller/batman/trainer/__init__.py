@@ -1,5 +1,7 @@
 import numpy as np
 
+import pickle
+
 from torch import Tensor, nn, optim, no_grad
 from torch.utils.data import DataLoader
 
@@ -10,7 +12,7 @@ from gupb.controller.batman.trainer.net import GuessRewardNet
 
 
 class Trainer:
-    def __init__(self, buffer_size: int = 1000, sample_limit: int = 250) -> None:
+    def __init__(self, buffer_size: int = 1500, sample_limit: int = 250) -> None:
         self.reset_buffer()
         self._buffer_size = buffer_size
         self._sample_limit = sample_limit
@@ -38,6 +40,9 @@ class Trainer:
         self._states.append(state)
         self._params.append(params)
         self._rewards.append(reward)
+
+        with open("./gupb/controller/batman/trainer/rewards.pkl", "wb") as file:
+            pickle.dump(self._rewards, file)
 
         if len(self._states) > self._buffer_size:
             self._states.pop(0)
